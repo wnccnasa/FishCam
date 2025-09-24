@@ -96,3 +96,8 @@ pip install gpiozero lgpio pigpio RPi.GPIO
 8. Install sensor_ts.service
 
 ```bash
+sudo bash install-sensors_ts-server.sh
+# Look at the logs to see if there are any issues.
+sudo systemctl status sensors_ts.service
+sudo journalctl -u sensor_ts.service -n 200
+```
