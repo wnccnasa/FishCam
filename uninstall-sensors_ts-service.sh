@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Uninstall the system_ts systemd service
-SERVICE_FILE="sensor_ts.service"
+SERVICE_FILE="sensors_ts.service"
 SERVICE_PATH="/etc/systemd/system/$SERVICE_FILE"
 
 echo "Stopping $SERVICE_FILE..."
