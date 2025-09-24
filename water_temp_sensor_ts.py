@@ -11,6 +11,7 @@ import os
 import sys
 import time
 from logging.handlers import TimedRotatingFileHandler
+# pip install w!thermsensor
 from w1thermsensor import W1ThermSensor
 
 # Get logger for this module (no handlers configured here)

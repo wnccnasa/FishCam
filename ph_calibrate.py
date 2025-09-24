@@ -19,7 +19,6 @@ Notes for students:
    and provide the center_voltage (defaults to 0.306 V), V_REF (default 3.3 V) and ADC_MAX (default 4095).
 """
 
-import sys
 import json
 
 # Defaults used when converting raw ADC counts to millivolts

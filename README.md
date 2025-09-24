@@ -50,9 +50,9 @@ Our set up uses a Raspberry Pi 5 with Bookworm 64-bit.
 
 2. sudo raspi-config
 
-    1. Enable i2c
-
-    2. Enable 1-Wire interface
+    1. 3. Interface Options
+    2. Enable i2c
+    3. Enable 1-Wire interface
 
 3. Clone the repository:
 
@@ -74,14 +74,21 @@ source .venv/bin/activate
 python -m pip install --upgrade pip
 ```
 
-5. Install bme680 for temperature, humidity and barometric pressure sensor.
+6. Install requests for ThingSpeak uploads.
 
 ```bash
-pip install bme680
+pip install requests
 ```
 
-6. Install OpenCV for web camera streaming.
+7. Install sensor libraries
 
 ```bash
+# Install bme680 for temperature, humidity and barometric pressure sensor.
+pip install bme680
+# Water temperature sensor.
+pip install w!thermsensor
+# Install OpenCV for web camera streaming.
 pip install opencv-python
+# Install GPIO Zero library for GPIO access for liquid level sensor.
+pip install gpiozero lgpio pigpio RPi.GPIO
 ```

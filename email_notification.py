@@ -456,13 +456,28 @@ class EmailNotifier:
             # Load HTML template and build content
             html_template = self._load_html_template("status_report.html")
             if html_template:
+                # Reorder sensor_data so that Air Temperature, Humidity, and Pressure
+                # (if present) are shown at the bottom of the report for emphasis.
+                preferred_bottom = ["Air Temperature", "Humidity", "Pressure"]
+                ordered_items = []
+
+                # First add all items not in preferred_bottom in their original order
+                for k, v in sensor_data.items():
+                    if k not in preferred_bottom:
+                        ordered_items.append((k, v))
+
+                # Then append preferred_bottom items if they exist in sensor_data
+                for k in preferred_bottom:
+                    if k in sensor_data:
+                        ordered_items.append((k, sensor_data[k]))
+
                 # Generate sensor data table rows
                 sensor_rows = ""
-                for sensor, value in sensor_data.items():
+                for sensor, value in ordered_items:
                     sensor_rows += f"""
                     <tr>
-                        <td style="padding: 10px; border-bottom: 1px solid #dee2e6;">{sensor}</td>
-                        <td style="padding: 10px; border-bottom: 1px solid #dee2e6; font-weight: bold; color: #28a745;">{value}</td>
+                        <td style=\"padding: 10px; border-bottom: 1px solid #dee2e6;\">{sensor}</td>
+                        <td style=\"padding: 10px; border-bottom: 1px solid #dee2e6; font-weight: bold; color: #28a745;\">{value}</td>
                     </tr>"""
 
                 # Set status color
@@ -487,7 +502,18 @@ class EmailNotifier:
     <h3>Current Readings:</h3>
     <ul>
 """
-                for sensor, value in sensor_data.items():
+                # Reorder sensor_data so that Air Temperature, Humidity, and Pressure
+                # (if present) are shown at the bottom in the fallback HTML as well.
+                preferred_bottom = ["Air Temperature", "Humidity", "Pressure"]
+                ordered_items = []
+                for k, v in sensor_data.items():
+                    if k not in preferred_bottom:
+                        ordered_items.append((k, v))
+                for k in preferred_bottom:
+                    if k in sensor_data:
+                        ordered_items.append((k, sensor_data[k]))
+
+                for sensor, value in ordered_items:
                     html_message += f"        <li>{sensor}: {value}</li>\n"
                 html_message += """
     </ul>
