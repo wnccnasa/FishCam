@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Install the web_stream systemd service
-SERVICE_FILE="sensor_ts.service"
+SERVICE_FILE="sensors_ts.service"
 SERVICE_PATH="/etc/systemd/system/$SERVICE_FILE"
 
 echo "Copying $SERVICE_FILE to $SERVICE_PATH..."
