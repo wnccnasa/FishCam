@@ -42,11 +42,46 @@ This project provides a comprehensive monitoring and notification system for an 
 - Use `log_manager.py` to view and manage logs.
 - Calibrate the pH sensor with `ph_calibrate.py`.
 
-## Requirements
+## Installation Steps
 
-- Python 3
-- GPIO Zero, bme680, requests, and other dependencies (see code comments for details)
+Our set up uses a Raspberry Pi 5 with Bookworm 64-bit.
 
-## Purpose
+1. Install latest Raspberry Pi OS using these steps: [Raspberry Pi Getting Started Guide (Bookworm)](https://github.com/itinstructor/GoPiGo3/blob/main/Raspberry_Pi/Raspberry_Pi_Getting_Started_Bookworm.pdf)
 
-This system is designed for real-time monitoring and management of aquaponics environments, providing robust data logging, alerting, and remote access via web and email.
+2. sudo raspi-config
+
+    1. Enable i2c
+
+    2. Enable 1-Wire interface
+
+3. Clone the repository:
+
+```bash
+git clone https://github.com/wnccnasa/fishcam.git
+```
+
+4. Create a virtual environment.
+
+```bash
+cd fishcam
+python -m venv .venv
+source .venv/bin/activate
+```
+
+5. Update pip.
+
+```bash
+python -m pip install --upgrade pip
+```
+
+5. Install bme680 for temperature, humidity and barometric pressure sensor.
+
+```bash
+pip install bme680
+```
+
+6. Install OpenCV for web camera streaming.
+
+```bash
+pip install opencv-python
+```
