@@ -10,7 +10,7 @@ After=network-online.target sshd.service
 [Service]
 Type=simple
 WorkingDirectory=/home/pi/Code/
-ExecStart=/usr/bin/python3 /home/pi/Code/sensors_ts.py
+ExecStart=/home/pi/fishcam/.venv/bin/python  /home/pi/Code/sensors_ts.py
 Restart=on-failure
 RestartSec=10
 User=pi
