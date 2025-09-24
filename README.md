@@ -92,3 +92,7 @@ pip install opencv-python
 # Install GPIO Zero library for GPIO access for liquid level sensor.
 pip install gpiozero lgpio pigpio RPi.GPIO
 ```
+
+8. Install sensor_ts.service
+
+```bash

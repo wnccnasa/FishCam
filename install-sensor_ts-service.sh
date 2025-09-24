@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Install the web_stream systemd service
-SERVICE_FILE="sensor_ts.service"
+SERVICE_FILE="./sensor_ts.service"
 SERVICE_PATH="/home/pi/fishcam/.venv/bin/python /etc/systemd/system/$SERVICE_FILE"
 
 echo "Copying $SERVICE_FILE to $SERVICE_PATH..."

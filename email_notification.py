@@ -279,6 +279,17 @@ class EmailNotifier:
                 # Generate sensor data table if sensor data is provided
                 sensor_data_table = ""
                 if sensor_data:
+                    # Reorder sensor_data so Air Temperature, Humidity, and Pressure
+                    # appear at the bottom of the alert email as well.
+                    preferred_bottom = ["Air Temperature", "Humidity", "Pressure"]
+                    ordered_items = []
+                    for k, v in sensor_data.items():
+                        if k not in preferred_bottom:
+                            ordered_items.append((k, v))
+                    for k in preferred_bottom:
+                        if k in sensor_data:
+                            ordered_items.append((k, sensor_data[k]))
+
                     sensor_data_table = """
         <div style="margin: 20px 0;">
             <h3 style="color: #495057; margin: 0 0 15px 0;">Current System Readings:</h3>
@@ -291,7 +302,7 @@ class EmailNotifier:
                 </thead>
                 <tbody>
 """
-                    for sensor, value in sensor_data.items():
+                    for sensor, value in ordered_items:
                         sensor_data_table += f"""
                     <tr>
                         <td style="padding: 10px; border-bottom: 1px solid #dee2e6;">{sensor}</td>
@@ -358,6 +369,16 @@ class EmailNotifier:
 """
 
                 if sensor_data:
+                    # Reorder sensor_data in fallback HTML for alerts too
+                    preferred_bottom = ["Air Temperature", "Humidity", "Pressure"]
+                    ordered_items = []
+                    for k, v in sensor_data.items():
+                        if k not in preferred_bottom:
+                            ordered_items.append((k, v))
+                    for k in preferred_bottom:
+                        if k in sensor_data:
+                            ordered_items.append((k, sensor_data[k]))
+
                     html_message += """
         <div style="margin: 20px 0;">
             <h3 style="color: #495057; margin: 0 0 15px 0;">Current System Readings:</h3>
@@ -370,7 +391,7 @@ class EmailNotifier:
                 </thead>
                 <tbody>
 """
-                    for sensor, value in sensor_data.items():
+                    for sensor, value in ordered_items:
                         html_message += f"""
                     <tr>
                         <td style="padding: 10px; border-bottom: 1px solid #dee2e6;">{sensor}</td>
