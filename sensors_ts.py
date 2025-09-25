@@ -27,7 +27,7 @@ from ph_sensor_ts import PHSensor
 from email_notification import EmailNotifier
 
 # Import configuration constants
-from aquaponics_config import (
+from config import (
     SENSOR_READ_INTERVAL,
     THINGSPEAK_INTERVAL,
     READINGS_PER_CYCLE,

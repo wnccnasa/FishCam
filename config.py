@@ -62,3 +62,13 @@ DEFAULT_PH = 7.0
 HTML_TEMPLATE_DIR = "html_templates"
 ALERT_EMAIL_TEMPLATE = "alert_email.html"
 STATUS_REPORT_TEMPLATE = "status_report.html"
+
+# Camera Overlay Configuration
+ENABLE_LABEL_OVERLAY = True  # Set to False to completely disable label feature
+LABEL_TEXT = "WNCC STEM Club Meeting Thursday at 4 PM in C1"  # Text to display on video
+LABEL_CYCLE_MINUTES = 10  # Show label every X minutes
+LABEL_DURATION_SECONDS = 30  # Show label for X seconds each cycle
+LABEL_FONT_SCALE = 0.8  # Size of the label text
+LABEL_TRANSPARENCY = 0.7  # Background transparency (0.0 = transparent, 1.0 = opaque)
+TEXT_TRANSPARENCY = 0.9  # Text transparency for overlays (0.0 = fully transparent, 1.0 = fully opaque)
+TEXT_COLOR = (0, 85, 204)  # Text color for overlays (BGR format - burnt orange)

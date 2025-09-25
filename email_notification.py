@@ -19,7 +19,7 @@ from datetime import datetime
 from logging.handlers import TimedRotatingFileHandler
 
 # Import configuration
-from aquaponics_config import (
+from config import (
     SMTP_SERVER, SMTP_PORT, EMAIL_TIMEOUT,
     DEFAULT_SENDER_EMAIL, DEFAULT_SENDER_PASSWORD,
     DEFAULT_RECIPIENT_EMAILS, SUBJECT_PREFIX, DEFAULT_SUBJECT,

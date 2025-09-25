@@ -52,6 +52,16 @@ from threading import (
 from typing import Optional  # For type hints
 
 from web_stream_page import PAGE
+from config import (
+    ENABLE_LABEL_OVERLAY,
+    LABEL_TEXT,
+    LABEL_CYCLE_MINUTES,
+    LABEL_DURATION_SECONDS,
+    LABEL_FONT_SCALE,
+    LABEL_TRANSPARENCY,
+    TEXT_TRANSPARENCY,
+    TEXT_COLOR
+)
 
 # Import OpenCV library for camera control
 # pip install opencv-python
@@ -104,16 +114,24 @@ logger.propagate = False
 # These are constants (values that don't change) that control how the camera behaves.
 # You can change these to adjust the video quality and frame rate.
 
-FRAME_RATE = 10  # How many pictures per second we want the camera to take
-# Note: Some cameras may ignore this setting and use their own preferred rate.
-# This is normal hardware behavior - the camera will tell us what it's actually using.
-# Frame rate limiting for bandwidth control
-MAX_STREAM_FPS = (
-    10  # Maximum FPS to send to clients (independent of camera FPS)
-)
+# Fish Tank Camera (Camera 0) Frame Rate Settings
+FISH_CAMERA_FRAME_RATE = 10  # How many pictures per second we want the fish camera to take
+FISH_CAMERA_MAX_STREAM_FPS = 10  # Maximum FPS to send to clients for fish camera
 
-VIDEO_WIDTH = 1280
-VIDEO_HEIGHT = 720
+# Plant Bed Camera (Camera 2) Frame Rate Settings  
+PLANT_CAMERA_FRAME_RATE = 7.5  # How many pictures per second we want the plant camera to take
+PLANT_CAMERA_MAX_STREAM_FPS = 7.5  # Maximum FPS to send to clients for plant camera
+
+# Note: Some cameras may ignore frame rate settings and use their own preferred rate.
+# This is normal hardware behavior - the camera will tell us what it's actually using.
+
+# Fish Tank Camera (Camera 0) Resolution
+FISH_CAMERA_WIDTH = 1280
+FISH_CAMERA_HEIGHT = 720
+
+# Plant Bed Camera (Camera 2) Resolution  
+PLANT_CAMERA_WIDTH = 1280
+PLANT_CAMERA_HEIGHT = 720
 
 # JPEG compression quality (0-100, higher = better quality but more bandwidth)
 JPEG_QUALITY = 85  # Good balance between quality and bandwidth
@@ -122,20 +140,7 @@ JPEG_QUALITY = 85  # Good balance between quality and bandwidth
 # Set to 0, 1, 2, etc. if you know your camera index, or None to auto-detect
 KNOWN_CAMERA_INDEX = 0
 
-# Label overlay configuration
-ENABLE_LABEL_OVERLAY = True  # Set to False to completely disable label feature
-LABEL_TEXT = (
-    "WNCC STEM Club Meeting Thursday at 4 in C1"  # Text to display on video
-)
-LABEL_CYCLE_MINUTES = 10  # Show label every X minutes
-LABEL_DURATION_SECONDS = 30  # Show label for X seconds each cycle
-LABEL_FONT_SCALE = 0.8  # Size of the label text
-# Background transparency (0.0 = transparent, 1.0 = opaque)
-LABEL_TRANSPARENCY = 0.7
-# Text transparency for overlays (0.0 = fully transparent, 1.0 = fully opaque)
-TEXT_TRANSPARENCY = 0.9
-# Text color for overlays (BGR)
-TEXT_COLOR = (0, 85, 204)  # Burnt orange in BGR for OpenCV
+# Note: Overlay configuration is now imported from aquaponics_config.py
 
 
 # --------------------- MEDIA RELAY (FRAME BROADCASTER) -------------------- #
@@ -151,7 +156,7 @@ class MediaRelay:
     - Uses threading.Condition to let clients wait for new frames
     """
 
-    def __init__(self):
+    def __init__(self, enable_overlay=True, rotation_angle=0, width=1280, height=720, frame_rate=10.0, max_stream_fps=10.0):
         # This will store the most recent camera frame as JPEG bytes
         self.frame = None
 
@@ -163,8 +168,16 @@ class MediaRelay:
         self.cap = None
         self.capture_thread = None
 
-        # Label timing control (only initialize if label overlay is enabled)
-        if ENABLE_LABEL_OVERLAY:
+        # Store camera-specific settings
+        self.enable_overlay = enable_overlay and ENABLE_LABEL_OVERLAY
+        self.rotation_angle = rotation_angle
+        self.width = width
+        self.height = height
+        self.frame_rate = frame_rate
+        self.max_stream_fps = max_stream_fps
+
+        # Label timing control (only initialize if label overlay is enabled for this camera)
+        if self.enable_overlay:
             self.label_start_time = (
                 time.time()
             )  # When we started the current cycle
@@ -187,28 +200,27 @@ class MediaRelay:
         logging.info(
             f"[MediaRelay] ✓ Camera {camera_index} opened successfully with V4L2"
         )
-        # Set camera resolution and frame rate
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, VIDEO_WIDTH)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, VIDEO_HEIGHT)
-        self.cap.set(cv2.CAP_PROP_FPS, FRAME_RATE)
-        # Check what settings the camera actually accepted (hardware may override)
+        
+        # Enhanced camera configuration with multiple attempts
+        self._configure_camera_settings(camera_index)
+        
+        # Check final settings
         actual_width = self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)
         actual_height = self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
         actual_fps = self.cap.get(cv2.CAP_PROP_FPS)
         logging.info(
-            f"[MediaRelay] Requested settings: {VIDEO_WIDTH}x{VIDEO_HEIGHT} @ {FRAME_RATE} FPS"
+            f"[MediaRelay] Final camera settings: {int(actual_width)}x{int(actual_height)} @ {actual_fps} FPS"
         )
-        logging.info(
-            f"[MediaRelay] Actual camera settings: {int(actual_width)}x{int(actual_height)} @ {actual_fps} FPS"
-        )
-        if actual_fps != FRAME_RATE:
+        
+        # Check if we got the desired settings
+        if int(actual_width) != self.width or int(actual_height) != self.height:
             logging.warning(
-                f"[MediaRelay] Note: Camera is using {actual_fps} FPS instead of requested {FRAME_RATE} FPS"
+                f"[MediaRelay] Camera {camera_index} resolution mismatch: requested {self.width}x{self.height}, got {int(actual_width)}x{int(actual_height)}"
             )
-            logging.info(
-                "[MediaRelay] This is normal - many cameras have fixed frame rates or limited options"
+        if actual_fps != self.frame_rate:
+            logging.warning(
+                f"[MediaRelay] Camera {camera_index} FPS mismatch: requested {self.frame_rate}, got {actual_fps}"
             )
-            logging.info("[MediaRelay] The streaming will still work properly")
 
         # Warm up the camera by capturing and discarding a few frames
         # This helps reduce initial lag and ensures stable image quality
@@ -228,12 +240,67 @@ class MediaRelay:
         self.capture_thread.daemon = True
         self.capture_thread.start()
 
+    def _configure_camera_settings(self, camera_index):
+        """Enhanced camera configuration with multiple attempts to force settings."""
+        logging.info(f"[MediaRelay] Configuring camera {camera_index} settings: {self.width}x{self.height} @ {self.frame_rate} FPS")
+        
+        # Method 1: Standard approach
+        success = self._try_camera_config("Standard configuration")
+        if success:
+            return
+            
+        # Method 2: Set FPS first, then resolution
+        logging.info(f"[MediaRelay] Trying FPS-first configuration...")
+        self.cap.set(cv2.CAP_PROP_FPS, self.frame_rate)
+        time.sleep(0.1)  # Small delay
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
+        time.sleep(0.1)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
+        success = self._check_settings("FPS-first configuration")
+        if success:
+            return
+            
+        # Method 3: Multiple attempts with delays
+        for attempt in range(3):
+            logging.info(f"[MediaRelay] Configuration attempt {attempt + 1}/3...")
+            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
+            time.sleep(0.2)
+            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
+            time.sleep(0.2)
+            self.cap.set(cv2.CAP_PROP_FPS, self.frame_rate)
+            time.sleep(0.2)
+            
+            if self._check_settings(f"Attempt {attempt + 1}"):
+                return
+                
+        logging.warning(f"[MediaRelay] Camera {camera_index} did not accept requested settings after multiple attempts")
+
+    def _try_camera_config(self, method_name):
+        """Try standard camera configuration."""
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
+        self.cap.set(cv2.CAP_PROP_FPS, self.frame_rate)
+        return self._check_settings(method_name)
+
+    def _check_settings(self, method_name):
+        """Check if camera accepted the requested settings."""
+        actual_width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        actual_height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        actual_fps = self.cap.get(cv2.CAP_PROP_FPS)
+        
+        if actual_width == self.width and actual_height == self.height:
+            logging.info(f"[MediaRelay] ✓ {method_name} successful: {actual_width}x{actual_height} @ {actual_fps} FPS")
+            return True
+        else:
+            logging.info(f"[MediaRelay] ✗ {method_name} failed: got {actual_width}x{actual_height} @ {actual_fps} FPS")
+            return False
+
     # ------------------------ CAPTURE FRAMES ------------------------------- #
     def _capture_frames(self):
         """This method runs in a background thread and keeps grabbing frames from the camera
         It stores the latest frame and notifies all waiting clients"""
         frame_time = (
-            1.0 / MAX_STREAM_FPS
+            1.0 / self.max_stream_fps
         )  # Calculate time between frames for rate limiting
         last_frame_time = 0
 
@@ -249,8 +316,8 @@ class MediaRelay:
                 # Try to read one frame from the camera
                 ret, frame = self.cap.read()
                 if ret:
-                    # Add WNCC STEM Club label timing logic (only if enabled)
-                    if ENABLE_LABEL_OVERLAY:
+                    # Add WNCC STEM Club label timing logic (only if enabled for this camera)
+                    if self.enable_overlay:
                         current_cycle_time = (
                             current_time - self.label_start_time
                         )
@@ -355,6 +422,17 @@ class MediaRelay:
                                 )
                                 self.label_shown = False
 
+                    # Apply rotation if specified for this camera
+                    if self.rotation_angle == 90:
+                        # Rotate 90 degrees counterclockwise
+                        frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+                    elif self.rotation_angle == 180:
+                        # Rotate 180 degrees
+                        frame = cv2.rotate(frame, cv2.ROTATE_180)
+                    elif self.rotation_angle == 270:
+                        # Rotate 270 degrees counterclockwise (or 90 degrees clockwise)
+                        frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
+
                     # Convert the frame to JPEG format with controlled quality for web streaming
                     encode_params = [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY]
                     _, buffer = cv2.imencode(".jpg", frame, encode_params)
@@ -429,58 +507,75 @@ class StreamingHandler(server.BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(content)))
             self.end_headers()
             self.wfile.write(content)
-        elif self.path == "/stream.mjpg":
-            # This is the video stream (MJPEG format)
-            # Increment the connection counter and log new connection
-            StreamingHandler.active_stream_connections += 1
-            logging.info(
-                f"New streaming client connected from {self.client_address[0]}. "
-                f"Active connections: {StreamingHandler.active_stream_connections}"
-            )
-
-            self.send_response(200)
-            self.send_header("Age", "0")
-            self.send_header("Cache-Control", "no-cache, private")
-            self.send_header("Pragma", "no-cache")
-            self.send_header(
-                "Content-Type", "multipart/x-mixed-replace; boundary=FRAME"
-            )
+        elif self.path == "/stream0.mjpg":
+            # Handle fish tank camera stream (camera 0)
+            self._handle_stream_request(relay0, "Fish Tank")
+        elif self.path == "/stream1.mjpg":
+            # Handle plant bed camera stream (camera 2)
+            self._handle_stream_request(relay1, "Plant Bed")
+        elif self.path == "/favicon.ico":
+            # Handle favicon requests to prevent 404 errors
+            self.send_response(204)  # No Content
             self.end_headers()
-            try:
-                while True:
-                    # Get the latest frame from the MediaRelay
-                    if relay is None:
-                        # If relay is not initialized, break out of the loop
-                        break
-                    frame = relay.get_frame()
-                    if frame is not None:
-                        # Send the frame boundary marker
-                        self.wfile.write(b"--FRAME\r\n")
-                        # Send headers for this JPEG image
-                        self.send_header("Content-Type", "image/jpeg")
-                        self.send_header("Content-Length", str(len(frame)))
-                        self.end_headers()
-                        # Send the actual image data
-                        self.wfile.write(frame)
-                        self.wfile.write(b"\r\n")
-            except Exception as e:
-                # If the browser disconnects or there's a network error, log it
-                logging.warning(
-                    "Removed streaming client %s: %s",
-                    self.client_address,
-                    str(e),
-                )
-            finally:
-                # Decrement the connection counter when client disconnects
-                StreamingHandler.active_stream_connections -= 1
-                logging.info(
-                    f"Streaming client {self.client_address[0]} disconnected. "
-                    f"Active connections: {StreamingHandler.active_stream_connections}"
-                )
         else:
             # Any other path: send a 404 Not Found error
             self.send_error(404)
             self.end_headers()
+
+    def _handle_stream_request(self, camera_relay, camera_description):
+        """Handle MJPEG stream requests for a specific camera relay."""
+        # Check if the requested camera relay is available
+        if camera_relay is None:
+            logging.error(
+                f"{camera_description} camera not available for {self.path}"
+            )
+            self.send_error(503, f"{camera_description} camera not available")
+            return
+
+        # Increment the connection counter and log new connection
+        StreamingHandler.active_stream_connections += 1
+        logging.info(
+            f"New {camera_description} streaming client connected from {self.client_address[0]} requesting {self.path}. "
+            f"Active connections: {StreamingHandler.active_stream_connections}"
+        )
+
+        self.send_response(200)
+        self.send_header("Age", "0")
+        self.send_header("Cache-Control", "no-cache, private")
+        self.send_header("Pragma", "no-cache")
+        self.send_header(
+            "Content-Type", "multipart/x-mixed-replace; boundary=FRAME"
+        )
+        self.end_headers()
+        try:
+            while True:
+                # Get the latest frame from the specific MediaRelay
+                frame = camera_relay.get_frame()
+                if frame is not None:
+                    # Send the frame boundary marker
+                    self.wfile.write(b"--FRAME\r\n")
+                    # Send headers for this JPEG image
+                    self.send_header("Content-Type", "image/jpeg")
+                    self.send_header("Content-Length", str(len(frame)))
+                    self.end_headers()
+                    # Send the actual image data
+                    self.wfile.write(frame)
+                    self.wfile.write(b"\r\n")
+        except Exception as e:
+            # If the browser disconnects or there's a network error, log it
+            logging.warning(
+                "Removed streaming client %s (%s): %s",
+                self.client_address,
+                camera_description,
+                str(e),
+            )
+        finally:
+            # Decrement the connection counter when client disconnects
+            StreamingHandler.active_stream_connections -= 1
+            logging.info(
+                f"{camera_description} streaming client {self.client_address[0]} disconnected from {self.path}. "
+                f"Active connections: {StreamingHandler.active_stream_connections}"
+            )
 
 
 # -------------------- STREAMING SERVER (Multi-Client) --------------------- #
@@ -511,8 +606,10 @@ class StreamingServer(socketserver.ThreadingMixIn, server.HTTPServer):
 
 
 # ======================= GLOBAL VARIABLES ================================= #
-# Global MediaRelay object that will be initialized in main()
-relay: Optional["MediaRelay"] = None
+# Global MediaRelay objects that will be initialized in main()
+# relay0 for fish tank (camera 0), relay1 for plants (camera 2)
+relay0: Optional["MediaRelay"] = None  # Fish tank camera
+relay1: Optional["MediaRelay"] = None  # Plant bed camera
 
 
 # ====================== MAIN PROGRAM STARTS HERE ========================== #
@@ -567,47 +664,64 @@ def find_working_camera():
 
 
 def main():
-    global relay  # Declare relay as global so it can be accessed by StreamingHandler
-
-    # Create the MediaRelay (frame broadcaster) object
-    # This will manage the camera and share frames with all clients
-    relay = MediaRelay()
+    global relay0, relay1  # Declare relays as global so they can be accessed by StreamingHandler
 
     # Print status messages to help users understand what's happening
-    logging.info("Starting USB camera streaming server with V4L2 backend...")
+    logging.info("Starting dual camera streaming server with V4L2 backend...")
+    logging.info("Camera 0: Fish Tank | Camera 2: Plant Bed")
 
-    # Find a working camera
-    working_camera_idx = find_working_camera()
+    # Initialize camera relay for fish tank (camera 0) with overlay enabled
+    relay0 = MediaRelay(
+        enable_overlay=True, 
+        rotation_angle=0, 
+        width=FISH_CAMERA_WIDTH, 
+        height=FISH_CAMERA_HEIGHT,
+        frame_rate=FISH_CAMERA_FRAME_RATE,
+        max_stream_fps=FISH_CAMERA_MAX_STREAM_FPS
+    )
+    try:
+        relay0.start_capture(camera_index=0)
+        logging.info(f"✓ Fish Tank camera (camera 0) initialized successfully with overlay at {FISH_CAMERA_WIDTH}x{FISH_CAMERA_HEIGHT} @ {FISH_CAMERA_FRAME_RATE} FPS (max stream: {FISH_CAMERA_MAX_STREAM_FPS} FPS)")
+    except Exception as e:
+        logging.error(
+            f"✗ Fish Tank camera (camera 0) failed to initialize: {e}"
+        )
+        relay0 = None
 
-    # Check if we found a working camera
-    if working_camera_idx is None:
-        # No camera found - print helpful error message and exit
-        logging.error("No USB cameras detected with V4L2 backend!")
+    # Initialize camera relay for plant bed (camera 2) with overlay disabled and 90° rotation
+    relay1 = MediaRelay(
+        enable_overlay=False, 
+        rotation_angle=90, 
+        width=PLANT_CAMERA_WIDTH, 
+        height=PLANT_CAMERA_HEIGHT,
+        frame_rate=PLANT_CAMERA_FRAME_RATE,
+        max_stream_fps=PLANT_CAMERA_MAX_STREAM_FPS
+    )
+    try:
+        relay1.start_capture(camera_index=2)
+        logging.info(f"✓ Plant Bed camera (camera 2) initialized successfully without overlay, rotated 90° counterclockwise at {PLANT_CAMERA_WIDTH}x{PLANT_CAMERA_HEIGHT} @ {PLANT_CAMERA_FRAME_RATE} FPS (max stream: {PLANT_CAMERA_MAX_STREAM_FPS} FPS)")
+    except Exception as e:
+        logging.error(
+            f"✗ Plant Bed camera (camera 2) failed to initialize: {e}"
+        )
+        relay1 = None
+
+    # Check if at least one camera is working
+    if relay0 is None and relay1 is None:
+        logging.error("No cameras could be initialized!")
         logging.error("Please check:")
-        logging.error("  - USB camera is connected properly")
-        logging.error("  - Camera is not being used by another application")
+        logging.error("  - USB cameras are connected properly")
+        logging.error("  - Cameras are not being used by another application")
         logging.error("  - Camera permissions: sudo usermod -a -G video $USER")
         logging.error("  - Available devices: ls -la /dev/video*")
         logging.error("  - V4L2 info: v4l2-ctl --list-devices")
-        # Exit the program with error code 1 (means something went wrong)
         exit(1)
 
-    # Start the camera capture
-    try:
-        # Double-check that we have a valid camera index
-        if working_camera_idx is not None:
-            # Start capturing frames in the background
-            relay.start_capture(camera_index=working_camera_idx)
-            logging.info(
-                f"Successfully started camera {working_camera_idx} with V4L2 backend (MediaRelay pattern)"
-            )
-        else:
-            # This shouldn't happen if our logic above is correct, but just in case...
-            raise RuntimeError("No working camera index found")
-    except Exception as e:
-        # If camera startup fails, print error and exit
-        logging.error(f"Failed to start camera: {e}")
-        exit(1)
+    # Log which cameras are available
+    if relay0:
+        logging.info("Fish Tank camera available at: /stream0.mjpg")
+    if relay1:
+        logging.info("Plant Bed camera available at: /stream1.mjpg")
 
     # Now start the web server
     try:
@@ -631,13 +745,23 @@ def main():
             local_ip = socket.gethostbyname(hostname)
 
             # Print connection information for users
-            logging.info(f"Streaming server started successfully!")
-            logging.info(f"Local access: http://localhost:8000/")
+            logging.info(f"Dual camera streaming server started successfully!")
+            logging.info(f"Dual camera view: http://localhost:8000/")
             logging.info(f"Network access: http://{local_ip}:8000/")
             logging.info(f"Raspberry Pi access: http://{hostname}.local:8000/")
+            if relay0:
+                logging.info(
+                    f"Fish Tank stream: http://{local_ip}:8000/stream0.mjpg"
+                )
+            if relay1:
+                logging.info(
+                    f"Plant Bed stream: http://{local_ip}:8000/stream1.mjpg"
+                )
         except:
             # If we can't get the IP address, just show localhost
-            logging.info("Streaming server started on http://localhost:8000/")
+            logging.info(
+                "Dual camera streaming server started on http://localhost:8000/"
+            )
 
         logging.info("Press Ctrl+C to stop the server")
         logging.info("-" * 50)
@@ -655,8 +779,13 @@ def main():
         # This block always runs, even if an error occurred
         # It ensures we clean up resources properly
 
-        # Stop the camera capture thread and close camera connection
-        relay.stop()
+        # Stop both camera capture threads and close camera connections
+        if relay0:
+            relay0.stop()
+            logging.info("Fish Tank camera stopped")
+        if relay1:
+            relay1.stop()
+            logging.info("Plant Bed camera stopped")
 
         logging.info("Cleanup completed. Goodbye!")
 
