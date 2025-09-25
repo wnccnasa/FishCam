@@ -9,8 +9,8 @@ After=network-online.target sshd.service
 
 [Service]
 Type=simple
-ExecStart=/home/pi/fishcam/.venv/bin/python /home/pi/fishcam/web_stream.py
-WorkingDirectory=/home/pi/Code
+ExecStart=/home/pi/FishCam/.venv/bin/python /home/pi/FishCam/web_stream.py
+WorkingDirectory=/home/pi/FishCam/
 Restart=on-failure
 RestartSec=10
 User=pi

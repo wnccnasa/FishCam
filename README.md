@@ -42,7 +42,7 @@ This project provides a comprehensive monitoring and notification system for an 
 - Use `log_manager.py` to view and manage logs.
 - Calibrate the pH sensor with `ph_calibrate.py`.
 
-## Installation Steps
+## FishCam Sensor Setup
 
 Our set up uses a Raspberry Pi 5 with Bookworm 64-bit.
 
@@ -60,21 +60,13 @@ Our set up uses a Raspberry Pi 5 with Bookworm 64-bit.
 # Change to the home directory.
 cd ~
 # Clone the repository.
-git clone https://github.com/wnccnasa/fishcam.git
-```
-
-```bash
-# Update code 
-cd fishcam
-git pull https://github.com/wnccnasa/fishcam.git
-# Restart service
-sudo systemctl restart sensors_ts.service
+git clone https://github.com/wnccnasa/FishCam.git
 ```
 
 4. Create a virtual environment.
 
 ```bash
-cd fishcam
+cd FishCam
 python -m venv .venv
 source .venv/bin/activate
 ```
@@ -97,9 +89,8 @@ pip install requests
 # Install bme680 for temperature, humidity and barometric pressure sensor.
 pip install bme680
 # Water temperature sensor.
-pip install w!thermsensor
-# Install OpenCV for web camera streaming.
-pip install opencv-python
+pip install w1thermsensor
+
 # Install GPIO Zero library for GPIO access for liquid level sensor.
 pip install gpiozero lgpio pigpio RPi.GPIO
 ```
@@ -111,6 +102,8 @@ sudo bash install-sensors_ts-server.sh
 # Look at the logs to see if there are any issues.
 sudo systemctl status sensors_ts.service
 sudo journalctl -u sensor_ts.service -n 200
+# Restart service
+sudo systemctl restart sensors_ts.service
 ```
 
 9. Set journald limits to conserve diskspace
@@ -118,3 +111,17 @@ sudo journalctl -u sensor_ts.service -n 200
 ```bash
 sudo bash install_journald_limits.sh
 ```
+
+## Setup FishCam Streaming
+
+```bash
+# Install opencv for camera streaming.
+pip install opencv-python
+```
+
+## Update FishCam Code
+
+```bash
+# Update code 
+cd FishCam
+git pull https://github.com/wnccnasa/FishCam.git

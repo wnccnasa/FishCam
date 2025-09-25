@@ -54,8 +54,7 @@ from typing import Optional  # For type hints
 from web_stream_page import PAGE
 
 # Import OpenCV library for camera control
-# Install: sudo apt install python3-opencv
-# or pip install opencv-python
+# pip install opencv-python
 import cv2
 
 # --------------------------- LOGGING SETUP -------------------------------- #
