@@ -91,7 +91,8 @@ email_notifier = EmailNotifier()
 TS_KEY = api_key_ts.THINGSPEAK_API_KEY
 
 # Global variables for email scheduling and water level tracking
-last_daily_email_date = None
+# Track last sent date per scheduled time (keyed by 'HH:MM')
+last_daily_email_dates = {}
 previous_water_level = None
 
 # Create ThingSpeak data dictionary
@@ -103,7 +104,18 @@ logger.info(
     f"Averaging {READINGS_PER_CYCLE} readings over {THINGSPEAK_INTERVAL/60:.0f} minutes"
 )
 if ENABLE_SCHEDULED_EMAILS:
-    logger.info(f"Daily summary emails at {DAILY_EMAIL_TIME}")
+    # Display configured daily times (support string or list)
+    try:
+        if isinstance(DAILY_EMAIL_TIME, list):
+            times_descr = ", ".join(DAILY_EMAIL_TIME)
+        elif isinstance(DAILY_EMAIL_TIME, str) and "," in DAILY_EMAIL_TIME:
+            times_descr = ", ".join([t.strip() for t in DAILY_EMAIL_TIME.split(",")])
+        else:
+            times_descr = str(DAILY_EMAIL_TIME)
+    except Exception:
+        times_descr = str(DAILY_EMAIL_TIME)
+
+    logger.info(f"Daily summary emails at {times_descr}")
     logger.info("Water level change alerts enabled")
 logger.info("Ctrl+C to exit!")
 
@@ -297,7 +309,8 @@ def check_water_level_change(
 
 def should_send_daily_email():
     """Check if it's time to send the daily summary email."""
-    global last_daily_email_date
+
+    global last_daily_email_dates
 
     if not ENABLE_SCHEDULED_EMAILS:
         return False
@@ -305,21 +318,40 @@ def should_send_daily_email():
     current_date = datetime.now().date()
     current_time = datetime.now().time()
 
-    # Parse daily email time
-    daily_hour, daily_minute = map(int, DAILY_EMAIL_TIME.split(":"))
-    daily_time = current_time.replace(
-        hour=daily_hour, minute=daily_minute, second=0, microsecond=0
-    )
+    # Normalize configured times into a list of 'HH:MM' strings
+    scheduled_times = []
+    if isinstance(DAILY_EMAIL_TIME, list):
+        scheduled_times = DAILY_EMAIL_TIME
+    elif isinstance(DAILY_EMAIL_TIME, str):
+        # allow comma-separated string like "06:00,18:00"
+        if "," in DAILY_EMAIL_TIME:
+            scheduled_times = [t.strip() for t in DAILY_EMAIL_TIME.split(",") if t.strip()]
+        else:
+            scheduled_times = [DAILY_EMAIL_TIME.strip()]
+    else:
+        # unexpected type - fallback to string conversion
+        scheduled_times = [str(DAILY_EMAIL_TIME)]
 
-    # Check if we haven't sent today's email and it's past the scheduled time
-    if last_daily_email_date != current_date and current_time >= daily_time:
-        return True
+    due_times = []
+    for t in scheduled_times:
+        try:
+            h, m = map(int, t.split(":"))
+        except Exception:
+            # skip invalid entries
+            continue
 
-    return False
+        scheduled_time = current_time.replace(hour=h, minute=m, second=0, microsecond=0)
+
+        # If we haven't sent for this scheduled time today and current time is past it
+        last_sent_date = last_daily_email_dates.get(t)
+        if last_sent_date != current_date and current_time >= scheduled_time:
+            due_times.append(t)
+
+    return due_times
 
 
 def send_daily_summary_email(
-    temp_f, humidity, pressure_inhg, water_temp_f, liquid_present
+    temp_f, humidity, pressure_inhg, water_temp_f, liquid_present, scheduled_time=None
 ):
     """Send daily summary email."""
     global last_daily_email_date
@@ -345,7 +377,9 @@ def send_daily_summary_email(
         )
 
         if success:
-            last_daily_email_date = datetime.now().date()
+            # Record last sent date for this scheduled_time (or default key)
+            key = scheduled_time if scheduled_time else "default"
+            last_daily_email_dates[key] = datetime.now().date()
             logger.info("✅ Daily summary email sent successfully")
         else:
             logger.error("❌ Failed to send daily summary email")
@@ -378,19 +412,22 @@ def main():
                 )
                 current_liquid_present = liquid_level_sensor.read_sensor()
 
-                # Check for daily summary email
-                if should_send_daily_email():
-                    send_daily_summary_email(
-                        current_temp_f,
-                        current_humidity,
-                        current_pressure_inhg,
-                        current_water_temp_f,
-                        (
-                            current_liquid_present
-                            if current_liquid_present is not None
-                            else 0
-                        ),
-                    )
+                # Check for daily summary email(s)
+                due = should_send_daily_email()
+                if due:
+                    for scheduled_time in due:
+                        send_daily_summary_email(
+                            current_temp_f,
+                            current_humidity,
+                            current_pressure_inhg,
+                            current_water_temp_f,
+                            (
+                                current_liquid_present
+                                if current_liquid_present is not None
+                                else 0
+                            ),
+                            scheduled_time=scheduled_time,
+                        )
 
             # Read BME680 sensor data using the abstracted module
             temp_f, humidity, pressure_inhg = sensor.read_sensors()

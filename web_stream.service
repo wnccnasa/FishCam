@@ -9,12 +9,20 @@ After=network-online.target sshd.service
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/python3 /home/pi/Code/web_stream.py
+ExecStart=/home/pi/fishcam/.venv/bin/python /home/pi/fishcam/web_stream.py
 WorkingDirectory=/home/pi/Code
 Restart=on-failure
 RestartSec=10
 User=pi
 Group=pi
+
+Environment=PYTHONUNBUFFERED=1
+# Send stdout/stderr to the journal
+StandardOutput=journal
+StandardError=journal
+# Friendly identifier in journalctl output
+SyslogIdentifier=web_stream
+
 
 [Install]
 WantedBy=multi-user.target

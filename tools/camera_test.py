@@ -9,7 +9,6 @@ import cv2
 import logging
 import os
 import json
-import sys
 import platform
 
 # Setup logging to console only
@@ -21,9 +20,9 @@ logging.basicConfig(
 def get_camera_backend():
     """Return appropriate camera backend for the current platform."""
     system = platform.system().lower()
-    if system == 'linux':
+    if system == "linux":
         return cv2.CAP_V4L2
-    elif system == 'windows':
+    elif system == "windows":
         return cv2.CAP_DSHOW  # DirectShow for Windows
     else:
         return 0  # Default backend for macOS and others
@@ -32,7 +31,11 @@ def get_camera_backend():
 def list_working_cameras(max_index=10, test_frames=3):
     """Return a list of all working camera indexes (0..max_index)."""
     backend = get_camera_backend()
-    backend_name = "V4L2" if backend == cv2.CAP_V4L2 else "DirectShow" if backend == cv2.CAP_DSHOW else "Default"
+    backend_name = (
+        "V4L2"
+        if backend == cv2.CAP_V4L2
+        else "DirectShow" if backend == cv2.CAP_DSHOW else "Default"
+    )
     working = []
     for cam_idx in range(max_index + 1):
         logging.info(f"Testing camera {cam_idx} with {backend_name}...")
@@ -174,7 +177,7 @@ def probe_camera_resolutions(camera_index, resolutions=None):
     }
 
     supported = []
-    for (w, h) in resolutions:
+    for w, h in resolutions:
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, w)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, h)
         cap.set(cv2.CAP_PROP_FPS, 20)  # Try to set 20 FPS like console mode
@@ -185,7 +188,11 @@ def probe_camera_resolutions(camera_index, resolutions=None):
             supported.append({"width": w, "height": h, "fps": fps})
 
     cap.release()
-    return {"index": camera_index, "default": default_info, "supported_resolutions": supported}
+    return {
+        "index": camera_index,
+        "default": default_info,
+        "supported_resolutions": supported,
+    }
 
 
 def probe_all_cameras(max_index=10):
@@ -205,14 +212,14 @@ if __name__ == "__main__":
 
     print("Camera Test Utility (OpenCV)")
     print("=============================")
-    
+
     # Always probe cameras and save to JSON
     data = probe_all_cameras(max_index=max_idx)
     json_output = json.dumps(data, indent=2)
-    
+
     # Save to camera_info.json
     try:
-        with open("camera_info.json", 'w') as f:
+        with open("camera_info.json", "w") as f:
             f.write(json_output)
         print("Camera information saved to: camera_info.json")
     except IOError as e:
@@ -225,11 +232,11 @@ if __name__ == "__main__":
     else:
         print("Working camera indexes:", ", ".join(map(str, working)))
         print()
-        
+
         # Show info for ALL working cameras, not just the first
         for i, cam_idx in enumerate(working):
             if i > 0:
-                print("\n" + "="*50)
+                print("\n" + "=" * 50)
             print(f"Camera {cam_idx} Details:")
             print_camera_info(cam_idx)
             scan_supported_resolutions_and_fps(cam_idx)

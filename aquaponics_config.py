@@ -12,7 +12,7 @@ READINGS_PER_CYCLE = THINGSPEAK_INTERVAL // SENSOR_READ_INTERVAL  # 20 readings
 
 # Email Configuration
 ENABLE_SCHEDULED_EMAILS = True
-DAILY_EMAIL_TIME = "06:00"  # HH:MM format for daily status email
+DAILY_EMAIL_TIME = "06:00,18:00"  # HH:MM format for daily status email
 
 # Email SMTP Configuration
 SMTP_SERVER = "smtp.gmail.com"
