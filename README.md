@@ -54,10 +54,21 @@ Our set up uses a Raspberry Pi 5 with Bookworm 64-bit.
     2. Enable i2c
     3. Enable 1-Wire interface
 
-3. Clone the repository:
+3. Clone the repository.
 
 ```bash
+# Change to the home directory.
+cd ~
+# Clone the repository.
 git clone https://github.com/wnccnasa/fishcam.git
+```
+
+```bash
+# Update code 
+cd fishcam
+git pull https://github.com/wnccnasa/fishcam.git
+# Restart service
+sudo systemctl restart sensors_ts.service
 ```
 
 4. Create a virtual environment.
