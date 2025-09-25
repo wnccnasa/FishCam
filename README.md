@@ -101,3 +101,9 @@ sudo bash install-sensors_ts-server.sh
 sudo systemctl status sensors_ts.service
 sudo journalctl -u sensor_ts.service -n 200
 ```
+
+9. Set journald limits to conserve diskspace
+
+```bash
+sudo bash install_journald_limits.sh
+```
