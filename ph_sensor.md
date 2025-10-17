@@ -39,41 +39,33 @@ Using the pH sensor (quick steps)
 
      python ph_sensor_ts.py
 
-Calibrating the pH probe (simple two-point calibration)
+Calibrating the pH probe (three-point calibration)
 ------------------------------------------------------
 
-You'll need two calibration solutions: pH 4.00 (acid) and pH 7.00 (neutral).
+You'll need three calibration solutions: pH 4.00 (acid), pH 7.00 (neutral), and pH 10.00 (alkaline).
 
 1. Rinse the probe in distilled water and gently blot dry.
 
 2. Place the probe in the pH 7.00 solution and let it stabilize (30-60s).
 
-  - Note the reported pH value from the program (or use the raw voltage).
+3. Note the reported pH value from the program (or use the raw voltage).
 
-3. Place the probe in the pH 4.00 solution and let it stabilize.
+4. Place the probe in the pH 4.00 solution and let it stabilize.
 
-  - Note the reported pH value.
+5. Note the reported pH value.
 
-From the two readings you can compute a linear calibration:
+6. Place the probe in the pH 10.00 solution and let it stabilize.
+
+7. Note the reported pH value.
+
+From the three readings you can compute a more accurate calibration:
 
    measured_mv = measured_voltage - center_voltage (in mV)
    ph = slope * measured_mv + offset
 
-Solve for slope and offset using your two calibration points (pH7 and pH4).
-A common simple approach is to set offset so measured value at pH7 == 7.0,
-then compute slope using the pH4 point.
-
-Notes and troubleshooting
--------------------------
-
-- If you see warnings about I2C or Grove Base Hat during startup, they are
-  often benign; verify the device appears in `i2cdetect` and that cables are
-  seated correctly.
-
-- Use `i2cdetect -y 1` to confirm you can see the Grove Base Hat on the bus.
-
-- If readings are extremely noisy, increase the averaging sample count and
-  ensure probe is clean and at stable temperature.
+For a linear calibration, use least-squares fitting with all three calibration points (pH 4, 7, and 10)
+to determine the optimal slope and offset. This three-point approach provides better accuracy across
+the full pH range compared to two-point calibration, especially for alkaline measurements.
 
 ## Notes and troubleshooting
 

@@ -60,7 +60,17 @@ from config import (
     LABEL_FONT_SCALE,
     LABEL_TRANSPARENCY,
     TEXT_TRANSPARENCY,
-    TEXT_COLOR
+    TEXT_COLOR,
+    FISH_CAMERA_WIDTH,
+    FISH_CAMERA_HEIGHT,
+    PLANT_CAMERA_WIDTH,
+    PLANT_CAMERA_HEIGHT,
+    FISH_CAMERA_FRAME_RATE,
+    PLANT_CAMERA_FRAME_RATE,
+    FISH_CAMERA_MAX_STREAM_FPS,
+    PLANT_CAMERA_MAX_STREAM_FPS,
+    JPEG_QUALITY,
+    KNOWN_CAMERA_INDEX,
 )
 
 # Import OpenCV library for camera control
@@ -110,38 +120,6 @@ logger.addHandler(console_handler)
 # Prevent propagation to avoid duplicate messages
 logger.propagate = False
 
-# ------------------------ CONFIGURATION VARIABLES ------------------------- #
-# These are constants (values that don't change) that control how the camera behaves.
-# You can change these to adjust the video quality and frame rate.
-
-# Fish Tank Camera (Camera 0) Frame Rate Settings
-FISH_CAMERA_FRAME_RATE = 10  # How many pictures per second we want the fish camera to take
-FISH_CAMERA_MAX_STREAM_FPS = 10  # Maximum FPS to send to clients for fish camera
-
-# Plant Bed Camera (Camera 2) Frame Rate Settings  
-PLANT_CAMERA_FRAME_RATE = 7.5  # How many pictures per second we want the plant camera to take
-PLANT_CAMERA_MAX_STREAM_FPS = 7.5  # Maximum FPS to send to clients for plant camera
-
-# Note: Some cameras may ignore frame rate settings and use their own preferred rate.
-# This is normal hardware behavior - the camera will tell us what it's actually using.
-
-# Fish Tank Camera (Camera 0) Resolution
-FISH_CAMERA_WIDTH = 1280
-FISH_CAMERA_HEIGHT = 720
-
-# Plant Bed Camera (Camera 2) Resolution  
-PLANT_CAMERA_WIDTH = 1280
-PLANT_CAMERA_HEIGHT = 720
-
-# JPEG compression quality (0-100, higher = better quality but more bandwidth)
-JPEG_QUALITY = 85  # Good balance between quality and bandwidth
-
-# Skip camera detection if you know your camera index (faster startup)
-# Set to 0, 1, 2, etc. if you know your camera index, or None to auto-detect
-KNOWN_CAMERA_INDEX = 0
-
-# Note: Overlay configuration is now imported from aquaponics_config.py
-
 
 # --------------------- MEDIA RELAY (FRAME BROADCASTER) -------------------- #
 class MediaRelay:
@@ -156,7 +134,15 @@ class MediaRelay:
     - Uses threading.Condition to let clients wait for new frames
     """
 
-    def __init__(self, enable_overlay=True, rotation_angle=0, width=1280, height=720, frame_rate=10.0, max_stream_fps=10.0):
+    def __init__(
+        self,
+        enable_overlay=True,
+        rotation_angle=0,
+        width=1280,
+        height=720,
+        frame_rate=10.0,
+        max_stream_fps=10.0,
+    ):
         # This will store the most recent camera frame as JPEG bytes
         self.frame = None
 
@@ -200,10 +186,10 @@ class MediaRelay:
         logging.info(
             f"[MediaRelay] ✓ Camera {camera_index} opened successfully with V4L2"
         )
-        
+
         # Enhanced camera configuration with multiple attempts
         self._configure_camera_settings(camera_index)
-        
+
         # Check final settings
         actual_width = self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)
         actual_height = self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
@@ -211,7 +197,7 @@ class MediaRelay:
         logging.info(
             f"[MediaRelay] Final camera settings: {int(actual_width)}x{int(actual_height)} @ {actual_fps} FPS"
         )
-        
+
         # Check if we got the desired settings
         if int(actual_width) != self.width or int(actual_height) != self.height:
             logging.warning(
@@ -242,13 +228,15 @@ class MediaRelay:
 
     def _configure_camera_settings(self, camera_index):
         """Enhanced camera configuration with multiple attempts to force settings."""
-        logging.info(f"[MediaRelay] Configuring camera {camera_index} settings: {self.width}x{self.height} @ {self.frame_rate} FPS")
-        
+        logging.info(
+            f"[MediaRelay] Configuring camera {camera_index} settings: {self.width}x{self.height} @ {self.frame_rate} FPS"
+        )
+
         # Method 1: Standard approach
         success = self._try_camera_config("Standard configuration")
         if success:
             return
-            
+
         # Method 2: Set FPS first, then resolution
         logging.info(f"[MediaRelay] Trying FPS-first configuration...")
         self.cap.set(cv2.CAP_PROP_FPS, self.frame_rate)
@@ -259,21 +247,25 @@ class MediaRelay:
         success = self._check_settings("FPS-first configuration")
         if success:
             return
-            
+
         # Method 3: Multiple attempts with delays
         for attempt in range(3):
-            logging.info(f"[MediaRelay] Configuration attempt {attempt + 1}/3...")
+            logging.info(
+                f"[MediaRelay] Configuration attempt {attempt + 1}/3..."
+            )
             self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
             time.sleep(0.2)
             self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
             time.sleep(0.2)
             self.cap.set(cv2.CAP_PROP_FPS, self.frame_rate)
             time.sleep(0.2)
-            
+
             if self._check_settings(f"Attempt {attempt + 1}"):
                 return
-                
-        logging.warning(f"[MediaRelay] Camera {camera_index} did not accept requested settings after multiple attempts")
+
+        logging.warning(
+            f"[MediaRelay] Camera {camera_index} did not accept requested settings after multiple attempts"
+        )
 
     def _try_camera_config(self, method_name):
         """Try standard camera configuration."""
@@ -287,12 +279,16 @@ class MediaRelay:
         actual_width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         actual_height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         actual_fps = self.cap.get(cv2.CAP_PROP_FPS)
-        
+
         if actual_width == self.width and actual_height == self.height:
-            logging.info(f"[MediaRelay] ✓ {method_name} successful: {actual_width}x{actual_height} @ {actual_fps} FPS")
+            logging.info(
+                f"[MediaRelay] ✓ {method_name} successful: {actual_width}x{actual_height} @ {actual_fps} FPS"
+            )
             return True
         else:
-            logging.info(f"[MediaRelay] ✗ {method_name} failed: got {actual_width}x{actual_height} @ {actual_fps} FPS")
+            logging.info(
+                f"[MediaRelay] ✗ {method_name} failed: got {actual_width}x{actual_height} @ {actual_fps} FPS"
+            )
             return False
 
     # ------------------------ CAPTURE FRAMES ------------------------------- #
@@ -423,14 +419,29 @@ class MediaRelay:
                                 self.label_shown = False
 
                     # Apply rotation if specified for this camera
+                    # Debug logging to help diagnose unexpected rotation behavior
+                    logging.debug(
+                        f"[MediaRelay] rotation_angle={self.rotation_angle}"
+                    )
                     if self.rotation_angle == 90:
                         # Rotate 90 degrees counterclockwise
-                        frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+                        logging.debug(
+                            "[MediaRelay] Applying rotation: 90° CCW (ROTATE_90_COUNTERCLOCKWISE)"
+                        )
+                        frame = cv2.rotate(
+                            frame, cv2.ROTATE_90_COUNTERCLOCKWISE
+                        )
                     elif self.rotation_angle == 180:
                         # Rotate 180 degrees
+                        logging.debug(
+                            "[MediaRelay] Applying rotation: 180° (ROTATE_180)"
+                        )
                         frame = cv2.rotate(frame, cv2.ROTATE_180)
                     elif self.rotation_angle == 270:
                         # Rotate 270 degrees counterclockwise (or 90 degrees clockwise)
+                        logging.debug(
+                            "[MediaRelay] Applying rotation: 270° CCW / 90° CW (ROTATE_90_CLOCKWISE)"
+                        )
                         frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
 
                     # Convert the frame to JPEG format with controlled quality for web streaming
@@ -672,34 +683,40 @@ def main():
 
     # Initialize camera relay for fish tank (camera 0) with overlay enabled
     relay0 = MediaRelay(
-        enable_overlay=True, 
-        rotation_angle=0, 
-        width=FISH_CAMERA_WIDTH, 
+        enable_overlay=True,
+        rotation_angle=0,
+        width=FISH_CAMERA_WIDTH,
         height=FISH_CAMERA_HEIGHT,
         frame_rate=FISH_CAMERA_FRAME_RATE,
-        max_stream_fps=FISH_CAMERA_MAX_STREAM_FPS
+        max_stream_fps=FISH_CAMERA_MAX_STREAM_FPS,
     )
     try:
         relay0.start_capture(camera_index=0)
-        logging.info(f"✓ Fish Tank camera (camera 0) initialized successfully with overlay at {FISH_CAMERA_WIDTH}x{FISH_CAMERA_HEIGHT} @ {FISH_CAMERA_FRAME_RATE} FPS (max stream: {FISH_CAMERA_MAX_STREAM_FPS} FPS)")
+        logging.info(
+            f"✓ Fish Tank camera (camera 0) initialized successfully with overlay at {FISH_CAMERA_WIDTH}x{FISH_CAMERA_HEIGHT} @ {FISH_CAMERA_FRAME_RATE} FPS (max stream: {FISH_CAMERA_MAX_STREAM_FPS} FPS)"
+        )
     except Exception as e:
         logging.error(
             f"✗ Fish Tank camera (camera 0) failed to initialize: {e}"
         )
         relay0 = None
 
-    # Initialize camera relay for plant bed (camera 2) with overlay disabled and 90° rotation
+    # PlantCam (camera 2) is used for plants in the aquaponics system
+    # It is mounted upside down, so we rotate the image 180 degrees
+    # Initialize camera relay for plant bed (camera 2) with overlay disabled and 180° rotation
     relay1 = MediaRelay(
-        enable_overlay=False, 
-        rotation_angle=90, 
-        width=PLANT_CAMERA_WIDTH, 
+        enable_overlay=False,
+        rotation_angle=180,
+        width=PLANT_CAMERA_WIDTH,
         height=PLANT_CAMERA_HEIGHT,
         frame_rate=PLANT_CAMERA_FRAME_RATE,
-        max_stream_fps=PLANT_CAMERA_MAX_STREAM_FPS
+        max_stream_fps=PLANT_CAMERA_MAX_STREAM_FPS,
     )
     try:
         relay1.start_capture(camera_index=2)
-        logging.info(f"✓ Plant Bed camera (camera 2) initialized successfully without overlay, rotated 90° counterclockwise at {PLANT_CAMERA_WIDTH}x{PLANT_CAMERA_HEIGHT} @ {PLANT_CAMERA_FRAME_RATE} FPS (max stream: {PLANT_CAMERA_MAX_STREAM_FPS} FPS)")
+        logging.info(
+            f"✓ Plant Bed camera (camera 2) initialized successfully without overlay, rotated 180° at {PLANT_CAMERA_WIDTH}x{PLANT_CAMERA_HEIGHT} @ {PLANT_CAMERA_FRAME_RATE} FPS (max stream: {PLANT_CAMERA_MAX_STREAM_FPS} FPS)"
+        )
     except Exception as e:
         logging.error(
             f"✗ Plant Bed camera (camera 2) failed to initialize: {e}"
@@ -793,7 +810,7 @@ def main():
 # If this script is run directly (not imported), call the main function
 if __name__ == "__main__":
     # Configure logging to show messages on the console
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.DEBUG)
 
     # Start the main program
     main()
